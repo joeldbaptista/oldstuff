@@ -274,32 +274,184 @@ It writes four files, and this list is complete: `sonar-train.csv` and
 `add-problem.sh`, and `sonar-test-labels.csv`, which holds the true label of
 each test point so that the result can be checked.
 
+### Running it
+
+Build the two programs, then load the training part, the five parameter sets
+in `data/sonar-params.csv`, and the test part as a problem:
+
 ```
+$ make bin
 $ ./make-training.sh -o test.sqlite3
 $ ./add-training-data.sh -d data/sonar-train.csv \
       -m data/sonar-train-metadata.csv -t test.sqlite3
+dsid=1
 $ ./add-parameters.sh -m data/sonar-params.csv -t test.sqlite3
+pid=1
+pid=2
+pid=3
+pid=4
+pid=5
 $ ./add-problem.sh -i data/sonar-test.csv -t test.sqlite3
-$ ./train-svm.sh -t test.sqlite3 -d 1 -p 4
-$ ./apply-svm.sh -p 1 -m 1 -t test.sqlite3
+prid=1
+```
+
+Train one model per parameter set, then score the problem with each:
+
+```
+$ for p in 1 2 3 4 5; do ./train-svm.sh -t test.sqlite3 -d 1 -p $p; done
+mid=1
+mid=2
+mid=3
+mid=4
+mid=5
+$ for m in 1 2 3 4 5; do ./apply-svm.sh -p 1 -m $m -t test.sqlite3; done
+51
+51
+51
+51
 51
 ```
 
-`data/sonar-params.csv` holds five settings. Joining `yhat` against
-`sonar-test-labels.csv` gives their accuracy on the 51 held-out points:
+That leaves 255 rows in `yhat`, being 51 data points scored by each of five
+models.
+
+### Reading the result
+
+The true labels sit outside the database, in `data/sonar-test-labels.csv`,
+because the schema keeps no table for the truth of a problem. So load them into
+a temporary table and join:
+
+```sh
+$ sqlite3 test.sqlite3 <<'SQL'
+CREATE TEMP TABLE truth (dpid INTEGER, y INTEGER);
+.mode csv
+.separator |
+.import --skip 1 data/sonar-test-labels.csv truth
+.mode column
+.headers on
+SELECT h.mid, p.comment,
+       sum((h.prob_positive > 0.5) = (t.y = 1)) AS correct,
+       count(*) AS total
+FROM yhat h
+JOIN truth t      ON t.dpid = h.dpid
+JOIN models m     ON m.mid = h.mid
+JOIN parameters p ON p.pid = m.pid
+WHERE h.prid = 1
+GROUP BY h.mid, p.comment ORDER BY h.mid;
+SQL
+```
 
 ```
-linear, cost 1                     44/51    86.27%
-linear, cost 10                    41/51    80.39%
-radial, cost 1, gamma 1/n          46/51    90.20%
-radial, cost 10, gamma 1/n         48/51    94.12%
-radial, cost 100, gamma 1.2        34/51    66.67%
+mid  comment                      correct  total
+---  ---------------------------  -------  -----
+1    linear, cost 1               44       51
+2    linear, cost 10              42       51
+3    radial, cost 1, gamma 1/n    46       51
+4    radial, cost 10, gamma 1/n   48       51
+5    radial, cost 100, gamma 1.2  41       51
 ```
 
-Those are the labels `sign(f(x))` gives. The last row is the setting the
-original `data/params.csv` carries, and it is far too sharp a kernel for 60
-variables, so it fits the training part and generalises badly. That ordering is
-itself a check on the implementation.
+So the best of the five is a radial kernel at cost 10 and gamma 1/n, at 48 of
+51, which is 94.12 per cent.
+
+### Accuracy, sensitivity and specificity
+
+Accuracy alone hides which way a model errs, so it is worth counting the four
+cells of the confusion matrix as well. With `+1` as the positive class, which
+in the sonar data is the mine:
+
+```sh
+$ sqlite3 test.sqlite3 <<'SQL'
+CREATE TEMP TABLE truth (dpid INTEGER, y INTEGER);
+.mode csv
+.separator |
+.import --skip 1 data/sonar-test-labels.csv truth
+.mode column
+.headers on
+
+SELECT h.mid, p.comment,
+       sum(pred =  1 AND t.y =  1) AS tp,
+       sum(pred = -1 AND t.y = -1) AS tn,
+       sum(pred =  1 AND t.y = -1) AS fp,
+       sum(pred = -1 AND t.y =  1) AS fn,
+       round(100.0 * sum(pred = t.y) / count(*), 2)              AS accuracy,
+       round(100.0 * sum(pred =  1 AND t.y =  1)
+             / nullif(sum(t.y =  1), 0), 2)                      AS sensitivity,
+       round(100.0 * sum(pred = -1 AND t.y = -1)
+             / nullif(sum(t.y = -1), 0), 2)                      AS specificity
+FROM (SELECT mid, prid, dpid,
+             CASE WHEN prob_positive > 0.5 THEN 1 ELSE -1 END AS pred
+      FROM yhat) h
+JOIN truth t      ON t.dpid = h.dpid
+JOIN models m     ON m.mid = h.mid
+JOIN parameters p ON p.pid = m.pid
+WHERE h.prid = 1
+GROUP BY h.mid, p.comment
+ORDER BY h.mid;
+SQL
+```
+
+```
+mid  comment                      tp  tn  fp  fn  accuracy  sensitivity  specificity
+---  ---------------------------  --  --  --  --  --------  -----------  -----------
+1    linear, cost 1               19  25  2   5   86.27     79.17        92.59
+2    linear, cost 10              18  24  3   6   82.35     75.0         88.89
+3    radial, cost 1, gamma 1/n    21  25  2   3   90.2      87.5         92.59
+4    radial, cost 10, gamma 1/n   21  27  0   3   94.12     87.5         100.0
+5    radial, cost 100, gamma 1.2  24  17  10  0   80.39     100.0        62.96
+```
+
+Four points on how that query works, and this list is complete:
+
+- The temp table carries the truth, because the schema keeps no table for the
+  true labels of a problem.
+- The inner subquery turns `prob_positive` into a label once, so the four
+  counts and the three rates all read the same `pred`.
+- SQLite returns 1 or 0 from a comparison, so `sum(pred = t.y)` counts
+  agreements directly. Multiplying by `100.0` forces real division instead of
+  integer division.
+- `nullif(..., 0)` guards a class that is absent from the problem, giving NULL
+  rather than an error.
+
+Two rows are worth reading closely. Model 4 makes no false positive at all, so
+its specificity is 100 per cent, and all three of its errors are mines called
+rocks. Model 5 is the opposite: it catches every mine, at 100 per cent
+sensitivity, by calling ten rocks mines as well. That is what an over-sharp
+kernel does, and accuracy alone would have hidden it.
+
+### The two ways of reading a label
+
+The figures above take the label from `prob_positive > 0.5`. Taking it from
+`sign(f(x))` instead gives a different count for two of the five:
+
+```
+parameter set                  by probability   by sign(f)
+linear, cost 1                     44/51          44/51
+linear, cost 10                    42/51          41/51
+radial, cost 1, gamma 1/n          46/51          46/51
+radial, cost 10, gamma 1/n         48/51          48/51
+radial, cost 100, gamma 1.2        41/51          34/51
+```
+
+The two disagree because the sigmoid puts its threshold at `-B/A` rather than
+at zero, as the Classification section explains. The gap is nil where the model
+is sound and wide where it is not, which is the last row: gamma 1.2 is far too
+sharp a kernel for 60 variables, so it fits the training part and generalises
+badly. LIBSVM shows the same split between the two readings.
+
+`score` prints the decision value itself under `-n`, which writes nothing to
+the database:
+
+```
+$ ./score -n -t test.sqlite3 -p 1 -m 4 | head -3
+0|0.14736915939109263|0.57505161525870596
+1|-1.8075620615244083|0.031913481400410962
+2|0.77812623467102227|0.81773321210577321
+```
+
+The three fields are the `dpid`, `f(x)` and `prob_positive`. Against LIBSVM on
+this same split, our labels by `sign(f(x))` agree on every one of the 51 points
+for all five parameter sets.
 
 ## The model
 
