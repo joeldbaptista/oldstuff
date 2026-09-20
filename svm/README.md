@@ -255,6 +255,52 @@ sigmoid parameters.
 Nothing is written when a step fails. Each tool checks its whole input before
 it touches the database, and the writes sit inside one transaction.
 
+## A worked test
+
+`data/sonar.csv` is labelled throughout, so scoring it with a model trained on
+all of it proves nothing. `data/split-sonar.sh` cuts it into two parts instead.
+The cut is deterministic and stratified: within each class, in file order,
+every fourth data point goes to the test part. So the class balance holds, 83
+negatives and 73 positives in the training part against 27 and 24 in the test
+part, and the files can be regenerated at any time.
+
+```
+$ ./data/split-sonar.sh
+train 156, test 51, variables 60
+```
+
+It writes four files, and this list is complete: `sonar-train.csv` and
+`sonar-train-metadata.csv` for `add-training-data.sh`, `sonar-test.csv` for
+`add-problem.sh`, and `sonar-test-labels.csv`, which holds the true label of
+each test point so that the result can be checked.
+
+```
+$ ./make-training.sh -o test.sqlite3
+$ ./add-training-data.sh -d data/sonar-train.csv \
+      -m data/sonar-train-metadata.csv -t test.sqlite3
+$ ./add-parameters.sh -m data/sonar-params.csv -t test.sqlite3
+$ ./add-problem.sh -i data/sonar-test.csv -t test.sqlite3
+$ ./train-svm.sh -t test.sqlite3 -d 1 -p 4
+$ ./apply-svm.sh -p 1 -m 1 -t test.sqlite3
+51
+```
+
+`data/sonar-params.csv` holds five settings. Joining `yhat` against
+`sonar-test-labels.csv` gives their accuracy on the 51 held-out points:
+
+```
+linear, cost 1                     44/51    86.27%
+linear, cost 10                    41/51    80.39%
+radial, cost 1, gamma 1/n          46/51    90.20%
+radial, cost 10, gamma 1/n         48/51    94.12%
+radial, cost 100, gamma 1.2        34/51    66.67%
+```
+
+Those are the labels `sign(f(x))` gives. The last row is the setting the
+original `data/params.csv` carries, and it is far too sharp a kernel for 60
+variables, so it fits the training part and generalises badly. That ordering is
+itself a check on the implementation.
+
 ## The model
 
 Reading a model back means joining `models` to `coefficients` and `bias`:
@@ -385,6 +431,18 @@ act.
 LIBSVM caches kernel values as `float` by default. That, and only that,
 accounts for the small disagreement seen against a stock build.
 
+On the split that `data/split-sonar.sh` produces, ours and LIBSVM agree exactly
+on the label of every one of the 51 test points, for all five parameter sets,
+giving 44, 41, 46, 48 and 34 correct. That comparison uses `sign(f(x))` on both
+sides, so it tests the model rather than the sigmoid.
+
+Labels taken from the probability instead can differ, because the two
+implementations fit the sigmoid on different folds. The difference is small
+where the model is sound, and it is nil for both radial settings at gamma 1/n.
+It is large for the deliberately over-sharp setting, where the cross-validated
+decision values carry little signal and the threshold `-B/A` is left doing the
+work.
+
 Scoring was checked the same way. Our decision values match those implied by
 LIBSVM's own model file to 1.4e-8 across all 207 points, which is the residue
 of the default stopping tolerance. On a 150 and 57 split of the sonar data, our
@@ -410,7 +468,7 @@ add-problem.sh        loads data points to be classified
 apply-svm.sh          runs score, which writes yhat
 sql/ddl.sql           the schema
 src/                  the C99 solver and scorer
-data/                 example inputs
+data/                 example inputs, and split-sonar.sh
 ```
 
 Inside `src`:
