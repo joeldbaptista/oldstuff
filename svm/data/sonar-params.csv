@@ -1,0 +1,6 @@
+kernel|cost|gamma|comment
+0|1|0|linear, cost 1
+0|10|0|linear, cost 10
+1|1|0.0167|radial, cost 1, gamma 1/n
+1|10|0.0167|radial, cost 10, gamma 1/n
+1|100|1.2|radial, cost 100, gamma 1.2
