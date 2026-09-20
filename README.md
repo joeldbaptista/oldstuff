@@ -14,3 +14,12 @@ as well. This pair is, in my opinion, the two sources to really learn how SVMs w
 The main objective of writing this code was to create a setup so tests could be easily run,
 and also I could really learn how SVMs work internally. The current version was compared
 with the recent versions of LibSVM, and shows no deviations.
+
+## Tree sandbox
+
+During my PhD I wanted to explore what could be done with trees. For example, how to use
+tree dept and space partition of find high density regions of the feature space. I would 
+like to have had the time to explore it more, but that has not happened. 
+
+With `itrees` I try to experimentally use the idea of isolation forest to find thematic
+outlines. Did not work as expected. 
