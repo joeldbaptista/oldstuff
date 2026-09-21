@@ -15,6 +15,11 @@ The main objective of writing this code was to create a setup so tests could be 
 and also I could really learn how SVMs work internally. The current version was compared
 with the recent versions of LibSVM, and shows no deviations.
 
+## Logistic regression
+
+As with `svm` I've used this to learn more about the algorihtm, but unlike `svm` I have 
+not used this in my PhD.
+
 ## Tree sandbox
 
 During my PhD I wanted to explore what could be done with trees. For example, how to use
@@ -22,4 +27,5 @@ tree dept and space partition of find high density regions of the feature space.
 like to have had the time to explore it more, but that has not happened. 
 
 With `itrees` I try to experimentally use the idea of isolation forest to find thematic
-outlines. Did not work as expected. 
+outlines. Did not work as expected. I haven't changed the code where it matters. I've formatted
+it, and added a visualisation piece, because it had been something I wanted to do but didn't. 
