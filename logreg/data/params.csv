@@ -1,0 +1,6 @@
+reg|lambda|comment
+2|0.001|L2, lambda 0.001
+2|0.01|L2, lambda 0.01
+2|0.1|L2, lambda 0.1
+1|0.005|L1, lambda 0.005
+1|0.02|L1, lambda 0.02
