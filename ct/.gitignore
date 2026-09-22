@@ -1,0 +1,4 @@
+*.sqlite3
+build-ct
+src/*.o
+*-pred.csv

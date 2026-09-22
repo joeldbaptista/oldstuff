@@ -1,0 +1,66 @@
+# Suckless C style, as specified in STYLE.md.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# 9. Line length capped at 80 characters.
+ColumnLimit: 80
+
+# 4. Tabs to indent code. Alignment padding stays spaces, so that
+#    comment and table columns line up at any tab width.
+UseTab: ForIndentation
+TabWidth: 8
+IndentWidth: 8
+ContinuationIndentWidth: 8
+
+# 3. `{` on the same line, preceded by a single space.
+# 6. Except for functions, where `{` goes on its own line.
+BreakBeforeBraces: Linux
+
+# 6. Return type and modifiers on their own line, for definitions only.
+BreakAfterReturnType: AllDefinitions
+
+# 2. A space after if/for/while/switch, none after `(` or before `)`.
+#    `sizeof` and real calls keep no space, since they are not keywords here.
+SpaceBeforeParens: ControlStatements
+SpacesInParens: Never
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+
+# 7. Do not indent cases another level.
+IndentCaseLabels: false
+IndentGotoLabels: false
+
+# 5. In pointer declarations the `*` is adjacent to the variable name.
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Keep every statement on its own line.
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Header order is logical, not alphabetical, so leave it alone.
+SortIncludes: Never
+IncludeBlocks: Preserve
+
+AlignAfterOpenBracket: Align
+AlwaysBreakBeforeMultilineStrings: true
+AlignArrayOfStructures: Left
+AlignEscapedNewlines: Left
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+BinPackArguments: true
+BinPackParameters: true
+Cpp11BracedListStyle: false
+IndentPPDirectives: None
+InsertNewlineAtEOF: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+ReflowComments: Never
+SpacesBeforeTrailingComments: 1
+...
