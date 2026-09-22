@@ -20,6 +20,10 @@ with the recent versions of LibSVM, and shows no deviations.
 As with `svm` I've used this to learn more about the algorihtm, but unlike `svm` I have 
 not used this in my PhD.
 
+## Classification tree
+
+An implementation of a classification tree. 
+
 ## Tree sandbox
 
 During my PhD I wanted to explore what could be done with trees. For example, how to use
